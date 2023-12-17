@@ -1,12 +1,10 @@
 import subprocess
 import os
 import configparser
-
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 def record_audio(audio_file):
-    print(index)
     args = ['sox', '-d', '-t', 'wav', audio_file]
     os.environ['AUDIODEV'] = config['audio']['InputDev']
     print(config['audio']['OutputDev'])
@@ -24,12 +22,11 @@ if __name__ == "__main__":
     while True:
         print("Press enter to record!")
         s = input()
-
         if last_process != None:
             last_process.terminate()
         prev_file_name = f'recordings/project/track-{index}.wav'
         play_audio(prev_file_name)
-        if s == 'e':
+        if s == 'q':
             break;
         print("Recording track!")
         index += 1
