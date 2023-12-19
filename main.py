@@ -4,7 +4,7 @@ import configparser
 from enum import Enum
 config = configparser.ConfigParser()
 config.read('config.studio.ini')
-
+pdir = 'project'
 def kill_list(ps):
     for p.process in ps:
         p.terminate()
@@ -92,6 +92,17 @@ class Recorder:
             self.play()
             self.mode = Mode.RECORD
             self.record()
+        elif s == 'dir':
+            print("Enter a project directory")
+            i = input()
+            global pdir
+            pdir = i
+            os.system(f'mkdir -p recordings/{i}')
+        elif s == 'config':
+            print("Enter a config path")
+            i = input()
+            config.read(i)
+
         else:
 
             self.play()
@@ -115,10 +126,11 @@ class Track:
         self.page = page
         self.play_process = None
         self.record_process = None
+        self.pdir = 'project'
     def record_audio(self):
         cpage = self.page
         ctrack = self.index
-        audio_file = f'recordings/project/page-{cpage}-track-{ctrack}.wav'
+        audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
         args = ['sox', '-d', '-t', 'wav', audio_file]
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['InputDev']
@@ -127,7 +139,7 @@ class Track:
     def play_audio(self):
         cpage = self.page
         ctrack = self.index
-        audio_file = f'recordings/project/page-{cpage}-track-{ctrack}.wav'
+        audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['OutputDev']
         play_args = ['play', audio_file, 'repeat', '65536'] 
