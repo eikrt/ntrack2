@@ -3,7 +3,7 @@ import os
 import configparser
 from enum import Enum
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read('config.studio.ini')
 
 def kill_list(ps):
     for p.process in ps:
@@ -28,7 +28,7 @@ class Recorder:
     def record(self):
         if self.current_track != None:
             self.current_track.stop_record()
-        t = Track(len(self.current_page.tracks), 0)
+        t = Track(len(self.current_page.tracks)+1, 0)
         t.record()
         self.current_page.current_track = t
         self.current_track = t
@@ -70,20 +70,33 @@ class Recorder:
             self.next_page()
         elif s == '-':
             self.previous_page()
+        elif s == 'cl':
+            self.current_page.stop_play()
+            self.current_page.stop_record()
+            self.current_page.tracks = []
         elif s == 'u':
-            if len(self.current_page.tracks)-1 > 0:
+            if len(self.current_page.tracks) > 0:
                 self.current_page.tracks[len(self.current_page.tracks)-1].stop_play() 
                 self.current_page.tracks[len(self.current_page.tracks)-1].stop_record() 
                 self.current_page.tracks.pop() 
-                self.current_track = self.current_page.tracks[len(self.current_page.tracks)-1]
+                if len(self.current_page.tracks) == 0:
+                    self.current_track = None
+                else:
+                    self.current_track = self.current_page.tracks[len(self.current_page.tracks)-1]
             else:
                 print("Couldn\'t undo track!")
         elif s == 'p':
             self.current_page.stop_record()
-        else:
-            self.mode = Mode.RECORD
+        elif s == 'r':
+
             self.play()
+            self.mode = Mode.RECORD
             self.record()
+        else:
+
+            self.play()
+            if self.current_track != None:
+                self.current_track.stop_record()
 
 class Page:
     def __init__(self, index=0):
@@ -109,7 +122,7 @@ class Track:
         args = ['sox', '-d', '-t', 'wav', audio_file]
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['InputDev']
-        process = subprocess.Popen(args, stdout=subprocess.PIPE)
+        process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return process
     def play_audio(self):
         cpage = self.page
@@ -117,8 +130,8 @@ class Track:
         audio_file = f'recordings/project/page-{cpage}-track-{ctrack}.wav'
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['OutputDev']
-        play_args = ['play', audio_file, 'repeat', '1024'] 
-        process = process_play = subprocess.Popen(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        play_args = ['play', audio_file, 'repeat', '65536'] 
+        process = subprocess.Popen(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return process
     def stop_record(self):
         if self.record_process != None:
@@ -148,7 +161,7 @@ class Track:
 if __name__ == "__main__":
     recorder = Recorder()
     while True:
-        print("Press enter to record! ")
+        print("Time to input some commands!")
         s = input()
         recorder.update()
         recorder.handle_input()
