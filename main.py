@@ -19,28 +19,67 @@ class Mode(Enum):
 class Recorder:
     def __init__(self):
         self.mode = Mode.CYCLE
-        self.current_track = Track()
-        self.current_page = Page()
-        self.tracks = []
+        self.current_track = None 
+        self.current_page = None 
+        self.pages = []
         self.last_rec = Track()
         self.last_play = Track() 
+        self.next_page()
     def record(self):
-        self.current_track.stop_record()
-        t = Track(len(self.tracks), 0)
+        if self.current_track != None:
+            self.current_track.stop_record()
+        t = Track(len(self.current_page.tracks), 0)
         t.record()
+        self.current_page.current_track = t
         self.current_track = t
-        self.tracks.append(t) 
+        self.current_page.tracks.append(t) 
     def play(self):
+        if self.current_track == None:
+            return
         self.current_track.play()
     def update(self):
         print("MODE: {self.mode}")
-        print(f'CURRENT TRACK: {self.current_track.index}')
-        print(f'CURRENT PAGE: {self.current_page.index}')
+        if self.current_track:
+            print(f'CURRENT TRACK: {self.current_track.index}')
+        else:
+            print('No current track!')
+        if self.current_page:
+            print(f'CURRENT PAGE: {self.current_page.index}')
+        else:
+            print('No current page!')
+    def next_page(self):
+        if self.current_page == None or self.current_page.index > len(self.pages):
+            self.new_page()
+        else:
+            self.current_page = self.pages[self.current_page.index + 1]
+    def new_page(self):
+        cpage = Page(len(self.pages))
+        self.pages.append(cpage)
+        self.current_page = cpage
+    def previous_page(self):
+        if current_page.index > 0:
+            current_page = self.pages[current_page.index - 1]
+        else:
+            print('Can\'t go to previous page')
     def handle_input(self):
         if s == 'q':
             return;
         elif s == 'c':
             self.mode = Mode.CYCLE
+        elif s == '+':
+            self.next_page()
+        elif s == '-':
+            self.previous_page()
+        elif s == 'u':
+            if len(self.current_page.tracks)-1 > 0:
+                self.current_page.tracks[len(self.current_page.tracks)-1].stop_play() 
+                self.current_page.tracks[len(self.current_page.tracks)-1].stop_record() 
+                self.current_page.tracks.pop() 
+                self.current_track = self.current_page.tracks[len(self.current_page.tracks)-1]
+            else:
+                print("Couldn\'t undo track!")
+        elif s == 'p':
+            self.current_page.stop_record()
         else:
             self.mode = Mode.RECORD
             self.play()
