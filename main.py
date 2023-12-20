@@ -1,6 +1,7 @@
 import subprocess
 import os
 import configparser
+import sys 
 from enum import Enum
 config = configparser.ConfigParser()
 config.read('config.studio.ini')
@@ -12,7 +13,45 @@ def kill_list(ps):
 def terminate_list(ps):
     for p.process in ps:
         p.terminate()
-
+class Project():
+    def __init__(self):
+        self.recorder = Recorder()
+        self.pconfig = configparser.ConfigParser() 
+    def new(self, path):
+        global pdir
+        pdir = path
+        os.system(f'mkdir -p recordings/{path}')
+    def load(self, path):
+        global pdir
+        pdir = path
+        self.pconfig.read(f'recordings/{path}/project.ini')
+        for p in range(int(self.pconfig[f'project']['pages'])):
+            self.recorder.next_page()
+            for i in range(int(self.pconfig[f'page-{p}']['tracks'])):
+                self.recorder.pages[p-1].tracks.append(Track(i+1, self.recorder.pages[p]))
+    def save(self):
+        print("Saving project...")
+        self.pconfig = configparser.ConfigParser()
+        self.pconfig['project'] = {'pages': len(self.recorder.pages)}
+        for p in self.recorder.pages:
+            i = p.index
+            self.pconfig[f'page-{i}'] = {'tracks': len(p.tracks)} 
+        with open(f'recordings/{pdir}/project.ini', 'w') as configfile:
+            self.pconfig.write(configfile)
+            print("Project saved successfully")
+    def quit(self):
+        print("See you around, partner!")
+        sys.exit()
+    def update(self):
+        while(True):
+            s = self.recorder.update()
+            if s == 'qs':
+                self.save()
+                self.quit()
+            elif s == 's':
+                self.save()
+            elif s == 'q!':
+                self.quit()
 class Mode(Enum):
     RECORD = 1
     CYCLE = 2
@@ -25,10 +64,11 @@ class Recorder:
         self.last_rec = Track()
         self.last_play = Track() 
         self.next_page()
+        self.prev_cmd = ''
     def record(self):
         if self.current_track != None:
             self.current_track.stop_record()
-        t = Track(len(self.current_page.tracks)+1, 0)
+        t = Track(len(self.current_page.tracks)+1, self.current_page)
         t.record()
         self.current_page.current_track = t
         self.current_track = t
@@ -47,23 +87,40 @@ class Recorder:
             print(f'CURRENT PAGE: {self.current_page.index}')
         else:
             print('No current page!')
+
+        s = project.recorder.handle_input()
+        return s
+
     def next_page(self):
-        if self.current_page == None or self.current_page.index > len(self.pages):
+
+        if self.current_page != None:
+            self.current_page.stop_play()
+            self.current_page.stop_record()
+
+        if self.current_page == None or self.current_page.index >= len(self.pages) - 1:
             self.new_page()
         else:
             self.current_page = self.pages[self.current_page.index + 1]
+
     def new_page(self):
         cpage = Page(len(self.pages))
         self.pages.append(cpage)
         self.current_page = cpage
     def previous_page(self):
-        if current_page.index > 0:
-            current_page = self.pages[current_page.index - 1]
+        if self.current_page.index > 0 and self.current_page != None:
+            self.current_page.stop_play()
+            self.current_page.stop_record()
+            self.current_page = self.pages[self.current_page.index - 1]
         else:
             print('Can\'t go to previous page')
+    def play_all(self):
+        self.current_page.play()
     def handle_input(self):
+        s = input()
         if s == 'q':
-            return;
+            return 'sq';
+        if s == 'q!':
+            return 'q';
         elif s == 'c':
             self.mode = Mode.CYCLE
         elif s == '+':
@@ -88,8 +145,6 @@ class Recorder:
         elif s == 'p':
             self.current_page.stop_record()
         elif s == 'r':
-
-            self.play()
             self.mode = Mode.RECORD
             self.record()
         elif s == 'dir':
@@ -102,12 +157,15 @@ class Recorder:
             print("Enter a config path")
             i = input()
             config.read(i)
-
+        elif s == 'play':
+            self.play_all();
         else:
-
-            self.play()
+            if self.prev_cmd == 'r':
+                self.play()
             if self.current_track != None:
                 self.current_track.stop_record()
+        self.prev_cmd = s
+        return s
 
 class Page:
     def __init__(self, index=0):
@@ -116,10 +174,14 @@ class Page:
     def stop_play(self):
         for t in self.tracks:
             t.stop_play()
-
     def stop_record(self):
         for t in self.tracks:
             t.stop_record()
+
+    def play(self):
+        print(self.tracks)
+        for t in self.tracks:
+            t.play_audio()
 class Track:
     def __init__(self, index=0, page=Page()):
         self.index = index
@@ -127,11 +189,13 @@ class Track:
         self.play_process = None
         self.record_process = None
         self.pdir = 'project'
+        cpage = self.page.index
+        ctrack = self.index
+        self.audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
     def record_audio(self):
         cpage = self.page
         ctrack = self.index
-        audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
-        args = ['sox', '-d', '-t', 'wav', audio_file]
+        args = ['sox', '-d', '-t', 'wav', self.audio_file]
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['InputDev']
         process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -139,10 +203,10 @@ class Track:
     def play_audio(self):
         cpage = self.page
         ctrack = self.index
-        audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['OutputDev']
-        play_args = ['play', audio_file, 'repeat', '65536'] 
+        play_args = ['play', self.audio_file, 'repeat', '65536'] 
+        print(self.audio_file)
         process = subprocess.Popen(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return process
     def stop_record(self):
@@ -171,9 +235,16 @@ class Track:
         if self.last_rec != None:
             self.last_rec.kill()
 if __name__ == "__main__":
-    recorder = Recorder()
-    while True:
-        print("Time to input some commands!")
-        s = input()
-        recorder.update()
-        recorder.handle_input()
+    project = Project()
+    print("Enter load (l) or new (n)...")
+    s = input()
+    if s == 'load' or s == 'l':
+        print("Specify a project to be loaded...")
+        p = input()
+        project.load(p)
+    if s == 'new' or s == 'n':
+        print("Specify a project name...")
+        p = input()
+        project.new(p)
+
+    project.update()
