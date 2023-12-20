@@ -150,13 +150,28 @@ class Recorder:
             print("Enter volume")
             vol = input()
             self.current_track.set_volume(vol)
+        elif s == 'effect':
+            print("Enter effect and its params")
+            effect = input().split(' ')
+            file1 = self.current_track.audio_file 
+            cpage = self.current_page.index
+            ctrack = len(self.current_page.tracks) + 1 
+            file2 = f'recordings/{pdir}/page-{cpage}/track-{ctrack}.wav'
+            args = ['sox', file1, file2, *effect]
+            subprocess.run(args)
+            self.current_page.tracks.append(Track(len(self.current_page.tracks) + 1, self.current_page))
+            self.current_track = self.current_page.tracks[len(self.current_page.tracks)-1] 
         elif s == 'config':
             print("Enter a config path")
             i = input()
             config.read(i)
-        elif s == 'play':
+        elif s == 'play page':
             self.play_all();
+        elif s == 'play':
+            self.current_track.play()
         elif s == 'stop play':
+            self.current_track.stop_play()
+        elif s == 'stop play all':
             self.current_page.stop_play()
         elif s == '+':
             if self.current_track.index < len(self.current_page.tracks):
