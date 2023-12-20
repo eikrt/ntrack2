@@ -2,6 +2,7 @@ import subprocess
 import os
 import configparser
 import sys 
+import time
 from multiprocessing import Process
 from enum import Enum
 config = configparser.ConfigParser()
@@ -58,18 +59,29 @@ class Project():
                 self.save()
             elif s == 'q!':
                 self.quit()
-class Mode(Enum):
-    RECORD = 1
-    CYCLE = 2
 class Recorder:
     def __init__(self):
-        self.mode = Mode.CYCLE
         self.current_track = None 
         self.current_page = None 
         self.pages = []
         self.last_rec = Track()
         self.last_play = Track() 
         self.prev_cmd = ''
+        self.metronome_playing = False
+        self.tempo = 100
+        self.metronome = None
+    def metronome_tick(self):
+        while (True): 
+            args= ['play', '-n','synth', '0.001', 'noise', '440', 'trim', '0', '1', 'gain', '-12']
+            self.metronome = subprocess.run(args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            time.sleep(60 / self.tempo)
+    def start_metronome(self):
+        self.metronome = Process(target=self.metronome_tick)
+        self.metronome.start()
+        self.metronome_playing = True
+    def stop_metronome(self):
+        self.metronome.terminate()
+        self.metronome_playing = False 
     def record(self):
         if self.current_track != None:
             self.current_track.stop_record()
@@ -83,8 +95,6 @@ class Recorder:
             return
         self.current_track.play()
     def update(self):
-        mode = self.mode
-        print("MODE: {mode}")
         if self.current_track:
             print(f'CURRENT TRACK: {self.current_track.index}')
         else:
@@ -186,6 +196,15 @@ class Recorder:
         elif s == '-':
             if self.current_track.index > 1:
                 self.current_track = self.current_page.tracks[self.current_track.index - 2]
+        elif s == 'set tempo':
+            print("Enter tempo")
+            i = input()
+            self.tempo = tempo
+        elif s == 'metronome':
+            if not self.metronome_playing:
+                self.start_metronome()
+            else:
+                self.stop_metronome()
         else:
             if self.prev_cmd == 'r':
                 self.play()
@@ -255,12 +274,12 @@ class Track:
         ctrack = self.index
         print(f'Recording track {ctrack}')
         self.record_process = self.record_audio()
-        self.record_process.daemon = True
     def play(self):
         cpage = self.page
         ctrack = self.index
         print(f'Playing track {ctrack}')
         self.process = Process(target=self.play_audio)
+        self.process.daemon = True
         self.process.start()
     def update(self, state):
         if len(self.current_rec_processes) > 0:
