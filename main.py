@@ -21,6 +21,8 @@ class Project():
         global pdir
         pdir = path
         os.system(f'mkdir -p recordings/{path}')
+        os.system(f'mkdir -p recordings/{path}/page-0')
+        self.recorder.next_page()
     def load(self, path):
         global pdir
         pdir = path
@@ -63,7 +65,6 @@ class Recorder:
         self.pages = []
         self.last_rec = Track()
         self.last_play = Track() 
-        self.next_page()
         self.prev_cmd = ''
     def record(self):
         if self.current_track != None:
@@ -78,7 +79,8 @@ class Recorder:
             return
         self.current_track.play()
     def update(self):
-        print("MODE: {self.mode}")
+        mode = self.mode
+        print("MODE: {mode}")
         if self.current_track:
             print(f'CURRENT TRACK: {self.current_track.index}')
         else:
@@ -106,6 +108,8 @@ class Recorder:
         cpage = Page(len(self.pages))
         self.pages.append(cpage)
         self.current_page = cpage
+        i = cpage.index
+        os.system(f'mkdir -p recordings/{pdir}/page-{i}')
     def previous_page(self):
         if self.current_page.index > 0 and self.current_page != None:
             self.current_page.stop_play()
@@ -117,11 +121,7 @@ class Recorder:
         self.current_page.play()
     def handle_input(self):
         s = input()
-        if s == 'q':
-            return 'sq';
-        if s == 'q!':
-            return 'q';
-        elif s == 'c':
+        if s == 'c':
             self.mode = Mode.CYCLE
         elif s == '+':
             self.next_page()
@@ -147,12 +147,6 @@ class Recorder:
         elif s == 'r':
             self.mode = Mode.RECORD
             self.record()
-        elif s == 'dir':
-            print("Enter a project directory")
-            i = input()
-            global pdir
-            pdir = i
-            os.system(f'mkdir -p recordings/{i}')
         elif s == 'config':
             print("Enter a config path")
             i = input()
@@ -179,7 +173,6 @@ class Page:
             t.stop_record()
 
     def play(self):
-        print(self.tracks)
         for t in self.tracks:
             t.play_audio()
 class Track:
@@ -191,7 +184,7 @@ class Track:
         self.pdir = 'project'
         cpage = self.page.index
         ctrack = self.index
-        self.audio_file = f'recordings/{pdir}/page-{cpage}-track-{ctrack}.wav'
+        self.audio_file = f'recordings/{pdir}/page-{cpage}/track-{ctrack}.wav'
     def record_audio(self):
         cpage = self.page
         ctrack = self.index
@@ -205,8 +198,7 @@ class Track:
         ctrack = self.index
         os.environ['AUDIODRIVER'] = config['audio']['Driver']
         os.environ['AUDIODEV'] = config['audio']['OutputDev']
-        play_args = ['play', self.audio_file, 'repeat', '65536'] 
-        print(self.audio_file)
+        play_args = ['play', self.audio_file, 'repeat', '-'] 
         process = subprocess.Popen(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return process
     def stop_record(self):
