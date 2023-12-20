@@ -31,6 +31,8 @@ class Project():
             self.recorder.next_page()
             for i in range(int(self.pconfig[f'page-{p}']['tracks'])):
                 self.recorder.pages[p-1].tracks.append(Track(i+1, self.recorder.pages[p]))
+        self.recorder.current_page = self.recorder.pages[0]
+        self.recorder.current_track = self.recorder.pages[0].tracks[0]
     def save(self):
         print("Saving project...")
         self.pconfig = configparser.ConfigParser()
@@ -121,11 +123,9 @@ class Recorder:
         self.current_page.play()
     def handle_input(self):
         s = input()
-        if s == 'c':
-            self.mode = Mode.CYCLE
-        elif s == '+':
+        if s == '++':
             self.next_page()
-        elif s == '-':
+        elif s == '--':
             self.previous_page()
         elif s == 'cl':
             self.current_page.stop_play()
@@ -145,14 +145,25 @@ class Recorder:
         elif s == 'p':
             self.current_page.stop_record()
         elif s == 'r':
-            self.mode = Mode.RECORD
             self.record()
+        elif s == 'vol':
+            print("Enter volume")
+            vol = input()
+            self.current_track.set_volume(vol)
         elif s == 'config':
             print("Enter a config path")
             i = input()
             config.read(i)
         elif s == 'play':
             self.play_all();
+        elif s == 'stop play':
+            self.current_page.stop_play()
+        elif s == '+':
+            if self.current_track.index < len(self.current_page.tracks):
+                self.current_track = self.current_page.tracks[self.current_track.index]
+        elif s == '-':
+            if self.current_track.index > 1:
+                self.current_track = self.current_page.tracks[self.current_track.index - 2]
         else:
             if self.prev_cmd == 'r':
                 self.play()
@@ -174,7 +185,7 @@ class Page:
 
     def play(self):
         for t in self.tracks:
-            t.play_audio()
+            t.play()
 class Track:
     def __init__(self, index=0, page=Page()):
         self.index = index
@@ -185,6 +196,10 @@ class Track:
         cpage = self.page.index
         ctrack = self.index
         self.audio_file = f'recordings/{pdir}/page-{cpage}/track-{ctrack}.wav'
+    def set_volume(self, vol):
+        file = self.audio_file
+        args = ['sox', '-v', vol, file, file]
+        subprocess.run(args)
     def record_audio(self):
         cpage = self.page
         ctrack = self.index
