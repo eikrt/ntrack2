@@ -2,10 +2,12 @@ import subprocess
 import os
 import configparser
 import sys 
+from multiprocessing import Process
 from enum import Enum
 config = configparser.ConfigParser()
 config.read('config.studio.ini')
 pdir = 'project'
+geffect = []
 def kill_list(ps):
     for p.process in ps:
         p.terminate()
@@ -161,6 +163,11 @@ class Recorder:
             subprocess.run(args)
             self.current_page.tracks.append(Track(len(self.current_page.tracks) + 1, self.current_page))
             self.current_track = self.current_page.tracks[len(self.current_page.tracks)-1] 
+        elif s == 'geffect':
+            print("Enter global effect and its params")
+            global geffect
+            geffect = input().split(' ')
+            
         elif s == 'config':
             print("Enter a config path")
             i = input()
@@ -207,6 +214,7 @@ class Track:
         self.page = page
         self.play_process = None
         self.record_process = None
+        self.process = None
         self.pdir = 'project'
         cpage = self.page.index
         ctrack = self.index
@@ -224,19 +232,22 @@ class Track:
         process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return process
     def play_audio(self):
-        cpage = self.page
-        ctrack = self.index
-        os.environ['AUDIODRIVER'] = config['audio']['Driver']
-        os.environ['AUDIODEV'] = config['audio']['OutputDev']
-        play_args = ['play', self.audio_file, 'repeat', '-'] 
-        process = subprocess.Popen(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return process
+        while(True):
+            cpage = self.page
+            ctrack = self.index
+            os.environ['AUDIODRIVER'] = config['audio']['Driver']
+            os.environ['AUDIODEV'] = config['audio']['OutputDev']
+            play_args = ['play', self.audio_file] 
+            self.record_process = subprocess.run(play_args,stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     def stop_record(self):
         if self.record_process != None:
             self.record_process.kill()
     def stop_play(self):
         if self.play_process!= None:
             self.play_process.kill()
+        if self.process != None:
+            self.process.terminate()
+
     def terminate(self):
         self.process.terminate()
     def record(self):
@@ -244,11 +255,13 @@ class Track:
         ctrack = self.index
         print(f'Recording track {ctrack}')
         self.record_process = self.record_audio()
+        self.record_process.daemon = True
     def play(self):
         cpage = self.page
         ctrack = self.index
         print(f'Playing track {ctrack}')
-        self.play_process = self.play_audio()
+        self.process = Process(target=self.play_audio)
+        self.process.start()
     def update(self, state):
         if len(self.current_rec_processes) > 0:
             self.last_rec = self.current_rec_processes[len(self.current_rec_processes)-1] 
