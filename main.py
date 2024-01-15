@@ -6,7 +6,7 @@ import time
 from multiprocessing import Process
 from enum import Enum
 config = configparser.ConfigParser()
-config.read('config.studio.ini')
+config.read('config.ini')
 pdir = 'project'
 geffect = []
 def kill_list(ps):
